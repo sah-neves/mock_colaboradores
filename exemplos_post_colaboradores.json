@@ -1,0 +1,63 @@
+[   {
+    "nome": "Mickey Mouse",
+    "email": "mickey@example.com",
+    "cargo": "Desenvolvedoro Frontend",
+    "level": "advanced",
+    "skills": [
+        {"nome": "HTML", "nivel": "advanced"},
+        {"nome": "Javascrit", "nivel": "advanced"}
+    ],
+    "id": 1
+    }, 
+    {
+    "nome": "Ana Pereira",
+    "email": "ana.pereira@example.com",
+    "cargo": "Desenvolvedora Frontend",
+    "level": "intermediate",
+    "skills": [
+      { "nome": "React", "nivel": "intermediate" },
+      { "nome": "CSS", "nivel": "advanced" }
+    ]
+  },
+  {
+    "nome": "Bruno Lima",
+    "email": "bruno.lima@example.com",
+    "cargo": "Engenheiro de Dados",
+    "level": "advanced",
+    "skills": [
+      { "nome": "Python", "nivel": "advanced" },
+      { "nome": "Spark", "nivel": "intermediate" }
+    ]
+  },
+  {
+    "nome": "Carla Mendes",
+    "email": "carla.mendes@example.com",
+    "cargo": "Analista de QA",
+    "level": "beginner",
+    "skills": [
+      { "nome": "Testes Automatizados", "nivel": "beginner" },
+      { "nome": "Selenium", "nivel": "beginner" }
+    ]
+  },
+  {
+    "nome": "Diego Rocha",
+    "email": "diego.rocha@example.com",
+    "cargo": "DevOps Engineer",
+    "level": "advanced",
+    "skills": [
+      { "nome": "AWS", "nivel": "advanced" },
+      { "nome": "Docker", "nivel": "advanced" }
+    ]
+  },
+  {
+    "nome": "Eduarda Farias",
+    "email": "eduarda.farias@example.com",
+    "cargo": "Product Designer",
+    "level": "intermediate",
+    "skills": [
+      { "nome": "Figma", "nivel": "advanced" },
+      { "nome": "UX Research", "nivel": "intermediate" }
+    ]
+  }
+]
+

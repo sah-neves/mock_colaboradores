@@ -1,109 +1,77 @@
-from typing import List
-
 from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
+from typing import List, Optional
+import uvicorn
 
 from colaboradores_db import (
-    delete_colaborador,
-    desinscrever_colaborador_de_projeto,
+    init_database,
     get_all_colaboradores,
     get_colaborador_by_id,
-    get_colaboradores_inscritos_em_projeto,
-    init_database,
-    inscrever_colaborador_em_projeto,
+    create_colaborador,
+    delete_colaborador,
 )
 
+# Inicializa banco de dados ao iniciar API
+init_database()
 
-class HabilidadePayload(BaseModel):
-    nome: str = Field(..., min_length=1)
-    nivel: str = Field(..., regex="^(beginner|intermediate|advanced)$")
+app = FastAPI(title="API de Colaboradores com SQLite")
 
+# models
+class Skill(BaseModel):
+    nome: str
+    nivel: str
 
 class ColaboradorBase(BaseModel):
+    nome: str
     email: EmailStr
-    nome: str = Field(..., min_length=1)
-    cargo: str = Field(..., min_length=1)
-    level: str = Field(..., regex="^(beginner|intermediate|advanced)$")
-    skills: List[HabilidadePayload] = Field(default_factory=list)
+    cargo: str
+    level: str
+    skills: List[Skill]
+
+class ColaboradorResponse(ColaboradorBase):
+    id: int
 
 
-app = FastAPI(title="Colaboradores API", version="0.1.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-def ao_iniciar() -> None:
-    init_database()
-
-
-@app.get("/colaboradores", response_model=List[ColaboradorBase])
+# routes
+@app.get("/colaboradores", response_model=List[ColaboradorResponse])
 def listar_colaboradores():
-    colaboradores = get_all_colaboradores()
-    return colaboradores
+    """Listar todos os colaboradores"""
+    return get_all_colaboradores()
 
 
-@app.get("/colaboradores/{colab_id}", response_model=ColaboradorBase)
-def obter_colaborador(colab_id: int):
-    colaborador = get_colaborador_by_id(colab_id)
-    if not colaborador:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Colaborador com id {colab_id} não encontrado.",
+@app.post("/colaboradores", response_model=ColaboradorResponse, status_code=status.HTTP_201_CREATED)
+def criar_colaborador_endpoint(colaborador: ColaboradorBase):
+    """Criar novo colaborador"""
+    try:
+        novo = create_colaborador(
+            colaborador.email,
+            colaborador.nome,
+            colaborador.cargo,
+            colaborador.level,
+            [s.dict() for s in colaborador.skills]
         )
-    return colaborador
+        return novo
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/colaboradores/{colab_id}", response_model=ColaboradorResponse)
+def buscar_colaborador(colab_id: int):
+    """Buscar colaborador pelo ID"""
+    colab = get_colaborador_by_id(colab_id)
+    if not colab:
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    return colab
 
 
 @app.delete("/colaboradores/{colab_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remover_colaborador(colab_id: int):
-    deleted = delete_colaborador(colab_id)
-    if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Colaborador com id {colab_id} não encontrado.",
-        )
-    return None
-
-
-@app.post("/colaboradores/{colab_id}/projetos/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def inscrever_em_projeto(colab_id: int, project_id: int):
-    sucesso = inscrever_colaborador_em_projeto(colab_id, project_id)
+def deletar_colaborador_endpoint(colab_id: int):
+    """Deletar colaborador"""
+    sucesso = delete_colaborador(colab_id)
     if not sucesso:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não foi possível inscrever o colaborador no projeto.",
-        )
-    return None
-
-
-@app.delete(
-    "/colaboradores/{colab_id}/projetos/{project_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def desinscrever_de_projeto(colab_id: int, project_id: int):
-    sucesso = desinscrever_colaborador_de_projeto(colab_id, project_id)
-    if not sucesso:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Associação entre colaborador e projeto não encontrada.",
-        )
-    return None
-
-
-@app.get("/projetos/{project_id}/colaboradores", response_model=List[int])
-def listar_colaboradores_do_projeto(project_id: int):
-    return get_colaboradores_inscritos_em_projeto(project_id)
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    return {"message": "Colaborador deletado com sucesso"}
 
 
 if __name__ == "__main__":
-    import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8002)
-
