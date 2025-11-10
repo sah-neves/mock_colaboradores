@@ -40,5 +40,5 @@ API simples construída com FastAPI para consumir o banco de dados de colaborado
 }
 ```
 
-# Para agilizar testes (por exemplo no Postman), você também pode reutilizar o arquivo `exemplos_post_colaboradores.json`, que contém várias requisições `POST /colaboradores` prontas para importar.
+Para agilizar testes (por exemplo no Postman), você também pode reutilizar o arquivo `exemplos_post_colaboradores.json`, que contém várias requisições `POST /colaboradores` prontas para importar.
 
