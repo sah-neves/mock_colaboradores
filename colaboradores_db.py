@@ -3,14 +3,15 @@ from typing import List, Dict, Optional
 
 DB_PATH = "colaboradores.db"
 
-
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
 def init_database():
+    """Cria tabelas se não existirem"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -42,27 +43,33 @@ def init_database():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS colaborador_projetos (
+            colaborador_id INTEGER NOT NULL,
+            projeto_id INTEGER NOT NULL,
+            PRIMARY KEY (colaborador_id, projeto_id),
+            FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
 
 
+# funções para colaboradores
 def get_all_colaboradores() -> List[Dict]:
+    """Retorna todos os colaboradores com suas skills"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM colaboradores ORDER BY id")
     colaboradores = []
+
     for row in cursor.fetchall():
         colab_id = row["id"]
-        cursor.execute("""
-            SELECT s.nome, cs.nivel
-            FROM colaborador_skills cs
-            JOIN skills s ON cs.skill_id = s.id
-            WHERE cs.colaborador_id = ?
-        """, (colab_id,))
-        skills = [{"nome": s["nome"], "nivel": s["nivel"]} for s in cursor.fetchall()]
+        skills = get_skills_do_colaborador(colab_id)
         colaboradores.append({
-            "id": row["id"],
+            "id": colab_id,
             "email": row["email"],
             "nome": row["nome"],
             "cargo": row["cargo"],
@@ -75,6 +82,7 @@ def get_all_colaboradores() -> List[Dict]:
 
 
 def create_colaborador(email: str, nome: str, cargo: str, level: str, skills: List[Dict]) -> Dict:
+    """Cria um novo colaborador e associa suas skills"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -85,9 +93,10 @@ def create_colaborador(email: str, nome: str, cargo: str, level: str, skills: Li
         """, (email, nome, cargo, level))
         colab_id = cursor.lastrowid
 
+        # Inserir skills
         for skill in skills:
-            skill_nome = skill["nome"]
-            skill_nivel = skill["nivel"]
+            skill_nome = skill["nome"].strip()
+            skill_nivel = skill["nivel"].strip()
 
             cursor.execute("INSERT OR IGNORE INTO skills (nome) VALUES (?)", (skill_nome,))
             cursor.execute("SELECT id FROM skills WHERE nome = ?", (skill_nome,))
@@ -100,6 +109,7 @@ def create_colaborador(email: str, nome: str, cargo: str, level: str, skills: Li
 
         conn.commit()
         return get_colaborador_by_id(colab_id)
+
     except sqlite3.IntegrityError as e:
         conn.rollback()
         raise ValueError(f"Erro ao criar colaborador: {e}")
@@ -108,6 +118,7 @@ def create_colaborador(email: str, nome: str, cargo: str, level: str, skills: Li
 
 
 def get_colaborador_by_id(colab_id: int) -> Optional[Dict]:
+    """Busca colaborador pelo ID"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -117,13 +128,7 @@ def get_colaborador_by_id(colab_id: int) -> Optional[Dict]:
         conn.close()
         return None
 
-    cursor.execute("""
-        SELECT s.nome, cs.nivel
-        FROM colaborador_skills cs
-        JOIN skills s ON cs.skill_id = s.id
-        WHERE cs.colaborador_id = ?
-    """, (colab_id,))
-    skills = [{"nome": s["nome"], "nivel": s["nivel"]} for s in cursor.fetchall()]
+    skills = get_skills_do_colaborador(colab_id)
     conn.close()
 
     return {
@@ -137,6 +142,7 @@ def get_colaborador_by_id(colab_id: int) -> Optional[Dict]:
 
 
 def delete_colaborador(colab_id: int) -> bool:
+    """Remove colaborador do banco"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM colaboradores WHERE id = ?", (colab_id,))
@@ -144,3 +150,82 @@ def delete_colaborador(colab_id: int) -> bool:
     conn.commit()
     conn.close()
     return deleted
+
+
+# skills do colaborador
+def get_skills_do_colaborador(colab_id: int) -> List[Dict]:
+    """Busca skills de um colaborador"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.nome, cs.nivel
+        FROM colaborador_skills cs
+        JOIN skills s ON cs.skill_id = s.id
+        WHERE cs.colaborador_id = ?
+    """, (colab_id,))
+    skills = [{"nome": s["nome"], "nivel": s["nivel"]} for s in cursor.fetchall()]
+    conn.close()
+    return skills
+
+
+# funcoes para projetos
+def add_colaborador_to_projeto(colab_id: int, projeto_id: int) -> Dict[str, int]:
+    """Adiciona colaborador a um projeto"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Verifica se colaborador existe
+        cursor.execute("SELECT 1 FROM colaboradores WHERE id = ?", (colab_id,))
+        if cursor.fetchone() is None:
+            raise LookupError("Colaborador não encontrado")
+
+        # Insere vínculo com projeto
+        cursor.execute("""
+            INSERT INTO colaborador_projetos (colaborador_id, projeto_id)
+            VALUES (?, ?)
+        """, (colab_id, projeto_id))
+
+        conn.commit()
+        return {"colaborador_id": colab_id, "project_id": projeto_id}
+
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        if "UNIQUE constraint failed" in str(e):
+            raise ValueError("Colaborador já inscrito neste projeto")
+        raise
+    finally:
+        conn.close()
+
+
+def remove_colaborador_de_projeto(colab_id: int, projeto_id: int) -> bool:
+    """Remove colaborador de um projeto"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM colaborador_projetos
+        WHERE colaborador_id = ? AND projeto_id = ?
+    """, (colab_id, projeto_id))
+
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+def get_colaboradores_por_projeto(projeto_id: int) -> List[int]:
+    """Lista IDs de colaboradores vinculados a um projeto"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT colaborador_id
+        FROM colaborador_projetos
+        WHERE projeto_id = ?
+        ORDER BY colaborador_id
+    """, (projeto_id,))
+
+    colaboradores = [row["colaborador_id"] for row in cursor.fetchall()]
+    conn.close()
+    return colaboradores
