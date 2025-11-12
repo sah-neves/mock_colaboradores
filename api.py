@@ -55,6 +55,10 @@ class ProjectEnrollmentResponse(BaseModel):
 
 # ======== ROTAS ========
 
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
 @app.get("/colaboradores", response_model=List[ColaboradorResponse])
 def listar_colaboradores():
     """Listar todos os colaboradores"""
