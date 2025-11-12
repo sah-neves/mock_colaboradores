@@ -1,7 +1,9 @@
 import sqlite3
 from typing import List, Dict, Optional
+from sqlalchemy import create_engine
 
-DB_PATH = "colaboradores.db"
+DB_PATH = 'postgresql://neondb_owner:npg_s7dS3DpLFVWZ@ep-polished-firefly-afeyrbis-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+engine = create_engine(DB_PATH)
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
